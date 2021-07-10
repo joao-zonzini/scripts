@@ -1,0 +1,21 @@
+#!/bin/bash
+
+USERNAME=$(whoami)
+
+sudo apt update -y
+
+if sudo apt upgrade -y; then
+	echo "$(date "+%d/%m/%Y %T") - Atualizacao bem-sucedida" >> /home/"$USERNAME"/upclean.log
+else
+	echo "$(date "+%d/%m/%Y %T") - Atualizacao Falhada" >> /home/"$USERNAME"/upclean.log
+fi
+
+sudo apt-get dist-upgrade -y
+
+sudo apt-get clean -y
+
+sudo apt autoremove -y
+
+sudo apt-get autoremove --purge
+
+sudo rm -rf ~/.cache/thumbnails
