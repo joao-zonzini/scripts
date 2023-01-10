@@ -1,34 +1,65 @@
 #!/bin/bash
 
-if [ $(bluetoothctl show | grep "Powered: yes" -c) -eq 1 ]; then
+## antes de tudo, verifica se o bluetooth esta ligado
 
-  CONECTADOS=0
-  J=0
+verificar_power_bluetooth() {
+    echo "$(bluetoothctl show | grep "Powered: yes" -c)"
+};
 
-  for (( i = 1; i <= $(bluetoothctl devices | wc | awk '{print $1}'); i++ )); do
-    echo $i
-    if [[ $(bluetoothctl info $(bluetoothctl devices | awk -v i="$i" 'FNR == i {print $2}') | grep "Connected: yes" -c) -eq 1 ]]; then
-      ARRAY[$J]=$i
-      ((J++))
-      ((CONECTADOS++))
+bligado="$(verificar_power_bluetooth)"
+
+if [ "$bligado" -eq 0 ]; then
+    echo "Bluetooth desligado"
+    exit 0
+fi
+
+## executa daqui pra frente apenas se bluetooth ligado
+
+## definicoes de funcoes
+
+verificar_n_dispositivos() {
+    echo "$(bluetoothctl devices | wc | awk '{print $1}')"
+};
+
+pegar_info_dispositivo() {
+    echo "$(bluetoothctl info "$(bluetoothctl devices | awk -v n="$1" 'FNR == n {print $2}')")"
+}
+
+verificar_se_conectado() {
+    echo "$(pegar_info_dispositivo "$1" | grep "Connected: yes" -c)"
+};
+
+pegar_nome_dispositivo() {
+    echo "$(pegar_info_dispositivo "$1" | grep "Name" | awk ' {$1=""; print $0} ')"
+}
+
+n_dispositivos="$(verificar_n_dispositivos)"
+
+CONECTADOS=0
+J=0
+
+for (( i = 1; i <= n_dispositivos; i++ )); do
+    if [[ "$(verificar_se_conectado $i)" -eq 1 ]]; then
+        ARRAY[J]=$i
+        ((J++))
+        ((CONECTADOS++))
     fi
-  done
+done
 
-  if [[ $CONECTADOS -eq 0 ]]; then
-    bluetoothctl power off
-    /usr/bin/notify-send "Desligando bluetooth"
-  elif [[ $CONECTADOS -gt 1 ]]; then
+if [[ $CONECTADOS -eq 0 ]]; then
+    echo "Nenhum dispositivo conectado --> Desligando bluetooth"
+    while ! bluetoothctl power off > /dev/null
+    do  
+        sleep 1
+    done
+    /usr/bin/notify-send "Bluetooth desligado"
+elif [[ $CONECTADOS -gt 1 ]]; then
     echo "Dispositivos Conectados:"
     for element in "${ARRAY[@]}"
     do
-      bluetoothctl info $(bluetoothctl devices | awk -v i="$element" 'FNR == i {print $2}') | grep "Name" | awk '{printf("\t%2s %3s\n", $2, $3)}'
+      pegar_nome_dispositivo "$element"
     done
-    else
-      echo "Dispositivo Conectado:"
-      bluetoothctl info $(bluetoothctl devices | awk -v i="${ARRAY[0]}" 'FNR == i {print $2}') | grep "Name" | awk '{printf("\t%2s %3s\n", $2, $3)}'
-    fi
-  fi
-
 else
-  echo "Bluetooth desligado"
+    echo "Dispositivo Conectado:"
+    pegar_nome_dispositivo "${ARRAY[@]}"
 fi
